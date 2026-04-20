@@ -1,71 +1,80 @@
+import os
 import time
 import logging
-from datetime import datetime
 from alpaca.trading.client import TradingClient
-from alpaca.trading.requests import MarketOrderRequest
+from alpaca.trading.requests import LimitOrderRequest
 from alpaca.trading.enums import OrderSide, TimeInForce
+from alpaca.data import StockHistoricalDataClient, ScreenerClient
+from alpaca.data.requests import StockSnapshotRequest
 
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s"
 )
 
-API_KEY    = "YOUR_ALPACA_PAPER_API_KEY"
-API_SECRET = "YOUR_ALPACA_PAPER_SECRET_KEY"
-SYMBOL     = "AAPL"
-SHARES_PER_BUY  = 1
-TOTAL_BUYS      = 10   # buy every minute, sell after 10 buys
+API_KEY    = os.environ["ALPACA_API_KEY"]
+API_SECRET = os.environ["ALPACA_API_SECRET"]
+SHARES_PER_BUY = 1
+INTERVAL_SECS  = 30
+MIN_VOLUME     = 500_000
+MIN_PRICE      = 10.0
+MAX_PRICE      = 500.0
+TOP_N          = 5
+LIMIT_OFFSET   = 0.995  # place limit 0.5% below latest trade price
 
-client = TradingClient(API_KEY, API_SECRET, paper=True)
+client          = TradingClient(API_KEY, API_SECRET, paper=True)
+data_client     = StockHistoricalDataClient(API_KEY, API_SECRET)
+screener_client = ScreenerClient(API_KEY, API_SECRET)
 
 
-def is_market_open() -> bool:
-    clock = client.get_clock()
-    return clock.is_open
+def select_tickers() -> list[str]:
+    movers  = screener_client.get_market_movers(top=20).gainers
+    symbols = [m.symbol for m in movers]
+
+    snapshots = data_client.get_stock_snapshot(StockSnapshotRequest(symbol_or_symbols=symbols))
+
+    candidates = []
+    for mover in movers:
+        snap = snapshots.get(mover.symbol)
+        if snap is None:
+            continue
+        price  = snap.latest_trade.price
+        volume = snap.daily_bar.volume if snap.daily_bar else 0
+        if MIN_PRICE <= price <= MAX_PRICE and volume >= MIN_VOLUME:
+            candidates.append((mover.symbol, mover.percent_change))
+
+    candidates.sort(key=lambda x: x[1], reverse=True)
+    selected = [sym for sym, _ in candidates[:TOP_N]]
+    logging.info(f"Selected tickers: {selected}")
+    return selected
 
 
-def place_order(side: OrderSide, qty: int):
-    order = MarketOrderRequest(
-        symbol=SYMBOL,
+def place_limit_buy(symbol: str, qty: int):
+    snap        = data_client.get_stock_snapshot(StockSnapshotRequest(symbol_or_symbols=symbol))
+    limit_price = round(snap[symbol].latest_trade.price * LIMIT_OFFSET, 2)
+    order = LimitOrderRequest(
+        symbol=symbol,
         qty=qty,
-        side=side,
-        time_in_force=TimeInForce.DAY
+        side=OrderSide.BUY,
+        time_in_force=TimeInForce.DAY,
+        limit_price=limit_price,
     )
     result = client.submit_order(order)
-    logging.info(f"{side.name} {qty} {SYMBOL} — order id: {result.id}")
+    logging.info(f"BUY {qty} {symbol} @ ${limit_price} limit — order id: {result.id}")
     return result
 
 
 def run():
-    logging.info("AAPL trading bot started (paper mode)")
-
-    while True:
-        if not is_market_open():
-            logging.info("Market closed — sleeping 60s")
-            time.sleep(60)
-            continue
-
-        logging.info("Market is open — starting 10-minute buy cycle")
-        shares_bought = 0
-
-        for i in range(TOTAL_BUYS):
-            # Re-check market is still open each minute
-            if not is_market_open():
-                logging.warning(f"Market closed mid-cycle at buy #{i+1} — aborting cycle")
-                break
-
-            place_order(OrderSide.BUY, SHARES_PER_BUY)
-            shares_bought += SHARES_PER_BUY
-            logging.info(f"Buy #{i+1}/{TOTAL_BUYS} complete — {shares_bought} shares held")
-
-            if i < TOTAL_BUYS - 1:   # no sleep after the last buy
-                time.sleep(60)
-
-        if shares_bought > 0:
-            logging.info(f"Selling all {shares_bought} shares")
-            place_order(OrderSide.SELL, shares_bought)
-
-        logging.info("Cycle complete — restarting loop")
+    tickers = select_tickers()
+    if not tickers:
+        logging.warning("No tickers passed screening — exiting.")
+        return
+    logging.info(f"Trading {len(tickers)} tickers in paper mode")
+    for i, symbol in enumerate(tickers):
+        place_limit_buy(symbol, SHARES_PER_BUY)
+        if i < len(tickers) - 1:
+            time.sleep(INTERVAL_SECS)
+    logging.info(f"Done — placed {len(tickers)} limit buy orders.")
 
 
 if __name__ == "__main__":
