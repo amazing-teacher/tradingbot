@@ -1,0 +1,10 @@
+{
+  "ticker": "AAPL",
+  "option_type": "call",
+  "strike": 210.00,
+  "limit_buy_price": 65.00,
+  "expiration_date": "2026-06-05",
+  "qty": 1,
+  "poll_interval_seconds": 30,
+  "fill_timeout_seconds": 3600
+}
