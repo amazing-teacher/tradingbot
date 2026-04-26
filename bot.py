@@ -4,12 +4,18 @@ import logging
 import os
 import time
 from contextlib import asynccontextmanager
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
+
+import pandas as pd
+import ta
+from alpaca.data.historical import StockHistoricalDataClient
+from alpaca.data.requests import StockBarsRequest
+from alpaca.data.timeframe import TimeFrame, TimeFrameUnit
 
 import uvicorn
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -28,10 +34,16 @@ API_KEY      = os.environ["ALPACA_API_KEY"]
 API_SECRET   = os.environ["ALPACA_API_SECRET"]
 STATE_FILE   = os.environ.get("STATE_FILE", "state.json")
 POLL_INTERVAL  = int(os.environ.get("POLL_INTERVAL", "60"))
-PROFIT_TARGET  = 0.20
-STOP_LOSS      = 0.10
+PROFIT_TARGET      = 0.20
+STOP_LOSS          = 0.10
+SIGNALS_BAR_LIMIT  = 200
+SIGNALS_CACHE_TTL  = 60  # seconds
 
-client = TradingClient(API_KEY, API_SECRET, paper=True)
+_signals_cache: dict = {}
+_signals_cache_time: float = 0.0
+
+client      = TradingClient(API_KEY, API_SECRET, paper=True)
+data_client = StockHistoricalDataClient(API_KEY, API_SECRET)
 
 TERMINAL_BAD = {
     OrderStatus.CANCELED,
@@ -154,6 +166,97 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 @app.get("/")
 def index():
     return FileResponse("static/index.html")
+
+
+@app.get("/signals")
+def get_signals():
+    global _signals_cache, _signals_cache_time
+    if time.time() - _signals_cache_time < SIGNALS_CACHE_TTL and _signals_cache:
+        return _signals_cache
+
+    try:
+        start = datetime.now(tz=None) - timedelta(days=7)
+        bars = data_client.get_stock_bars(StockBarsRequest(
+            symbol_or_symbols=["SPY", "VXX"],
+            timeframe=TimeFrame(5, TimeFrameUnit.Minute),
+            start=start,
+            limit=SIGNALS_BAR_LIMIT,
+        ))
+        bar_data = bars.data
+        if "SPY" not in bar_data or not bar_data["SPY"]:
+            return JSONResponse(status_code=503, content={"error": "insufficient_data", "message": "No SPY bars returned. Market may be closed or data unavailable."})
+        spy_df = pd.DataFrame([b.__dict__ for b in bar_data["SPY"]]).set_index("timestamp")
+        vxx_bars = bar_data.get("VXX", [])
+        vxx_df = pd.DataFrame([b.__dict__ for b in vxx_bars]).set_index("timestamp") if vxx_bars else None
+    except Exception as e:
+        logging.error(f"[signals] fetch error: {e}")
+        return JSONResponse(status_code=503, content={"error": "fetch_failed", "message": str(e)})
+
+    if spy_df.empty or len(spy_df) < 35:
+        return JSONResponse(status_code=503, content={"error": "insufficient_data", "message": "Not enough SPY bars. Market may be closed."})
+
+    try:
+        close        = spy_df["close"].squeeze()
+        latest_price = float(close.iloc[-1])
+        fetched_at   = spy_df.index[-1].isoformat()
+
+        # RSI
+        rsi_val    = float(ta.momentum.RSIIndicator(close, window=14).rsi().iloc[-1])
+        rsi_signal = "bullish" if rsi_val < 35 else ("bearish" if rsi_val > 65 else "neutral")
+
+        # MACD histogram
+        macd_ind  = ta.trend.MACD(close, window_fast=12, window_slow=26, window_sign=9)
+        hist      = macd_ind.macd_diff()
+        hist_now  = float(hist.iloc[-1])
+        hist_prev = float(hist.iloc[-2])
+        if hist_now > 0 and hist_now > hist_prev:
+            macd_signal = "bullish"
+        elif hist_now < 0 and hist_now < hist_prev:
+            macd_signal = "bearish"
+        else:
+            macd_signal = "neutral"
+
+        # EMA20
+        ema20_val  = float(ta.trend.EMAIndicator(close, window=20).ema_indicator().iloc[-1])
+        ema_signal = "bullish" if latest_price > ema20_val else "bearish"
+
+        # VXX
+        vxx_data = None
+        if vxx_df is not None and not vxx_df.empty and len(vxx_df) >= 20:
+            vxx_close   = float(vxx_df["close"].iloc[-1])
+            vxx_mean    = float(vxx_df["close"].tail(20).mean())
+            vxx_signal  = "falling" if vxx_close < vxx_mean else "rising"
+            vxx_data = {
+                "value": round(vxx_close, 2),
+                "signal": vxx_signal,
+                "explanation": "VXX tracks short-term VIX futures. Falling = declining fear (call-friendly). Rising = increasing fear (put-friendly).",
+            }
+
+        # Verdict
+        signals    = [rsi_signal, macd_signal, ema_signal]
+        bull_count = signals.count("bullish")
+        bear_count = signals.count("bearish")
+        verdict    = "Consider CALL" if bull_count > bear_count else ("Consider PUT" if bear_count > bull_count else "No clear signal")
+
+        result = {
+            "fetched_at": fetched_at,
+            "spy_price": round(latest_price, 2),
+            "indicators": {
+                "rsi":   {"value": round(rsi_val, 2),   "signal": rsi_signal,  "explanation": "Measures momentum (0–100). Below 35 = oversold/bullish, above 65 = overbought/bearish."},
+                "macd":  {"histogram": round(hist_now, 4), "signal": macd_signal, "explanation": "Trend momentum. Histogram above zero and rising = bullish momentum building."},
+                "ema20": {"value": round(ema20_val, 2), "signal": ema_signal,  "explanation": "20-period moving average. Price above EMA = uptrend (bullish), below = downtrend (bearish)."},
+            },
+            "vxx": vxx_data,
+            "verdict": verdict,
+        }
+
+        _signals_cache      = result
+        _signals_cache_time = time.time()
+        return result
+
+    except Exception as e:
+        logging.error(f"[signals] computation error: {e}")
+        return JSONResponse(status_code=500, content={"error": "computation_failed", "message": str(e)})
 
 
 class OrderRequest(BaseModel):

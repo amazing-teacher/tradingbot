@@ -13,11 +13,152 @@
       color: #e2e8f0;
       min-height: 100vh;
       display: flex;
+      flex-direction: column;
       align-items: center;
-      justify-content: center;
-      padding: 24px;
+      justify-content: flex-start;
+      padding: 32px 24px;
+      gap: 20px;
     }
 
+    /* ── Signals panel ─────────────────────────────────────────────────────── */
+    .signals-card {
+      background: #1a1d27;
+      border: 1px solid #2d3148;
+      border-radius: 16px;
+      padding: 28px 32px;
+      width: 100%;
+      max-width: 560px;
+      box-shadow: 0 8px 40px rgba(0,0,0,0.4);
+    }
+
+    .signals-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 18px;
+    }
+
+    .signals-header h2 {
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: #f0f4ff;
+    }
+
+    .refresh-btn {
+      padding: 7px 16px;
+      font-size: 0.82rem;
+      font-weight: 600;
+      background: #23263a;
+      border: 1px solid #2d3148;
+      border-radius: 8px;
+      color: #a5b4fc;
+      cursor: pointer;
+      transition: background 0.15s;
+      width: auto;
+    }
+    .refresh-btn:hover:not(:disabled) { background: #2d3148; }
+    .refresh-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .spy-price {
+      font-size: 0.82rem;
+      color: #6b7a99;
+      margin-bottom: 14px;
+      font-family: "SF Mono", "Fira Code", monospace;
+    }
+    .spy-price strong { color: #e2e8f0; }
+
+    .indicator-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+
+    .indicator-row-full { margin-bottom: 10px; }
+
+    .indicator-tile {
+      background: #0f1117;
+      border: 1px solid #2d3148;
+      border-radius: 10px;
+      padding: 14px 16px;
+    }
+
+    .indicator-name {
+      font-size: 0.7rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.7px;
+      color: #8892a4;
+      margin-bottom: 6px;
+    }
+
+    .indicator-value {
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: #e2e8f0;
+      font-family: "SF Mono", "Fira Code", monospace;
+      margin-bottom: 6px;
+    }
+
+    .indicator-signal {
+      font-size: 0.72rem;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 4px;
+      display: inline-block;
+      margin-bottom: 8px;
+    }
+
+    .sig-bullish, .sig-falling { background: #0d2b1f; color: #4ade80; border: 1px solid #1a5c38; }
+    .sig-bearish, .sig-rising  { background: #2b0d0d; color: #f87171; border: 1px solid #5c1a1a; }
+    .sig-neutral               { background: #1a1d27; color: #94a3b8; border: 1px solid #2d3148; }
+
+    .indicator-explanation {
+      font-size: 0.72rem;
+      color: #4a5568;
+      line-height: 1.45;
+    }
+
+    .verdict-box {
+      border-radius: 10px;
+      padding: 16px 18px;
+      text-align: center;
+      margin-top: 4px;
+    }
+    .verdict-call { background: #0d2b1f; border: 1px solid #1a5c38; }
+    .verdict-put  { background: #2b0d0d; border: 1px solid #5c1a1a; }
+    .verdict-none { background: #16182a; border: 1px solid #2d3148; }
+
+    .verdict-label {
+      font-size: 0.7rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: #8892a4;
+      margin-bottom: 4px;
+    }
+    .verdict-text { font-size: 1.1rem; font-weight: 700; }
+    .verdict-call .verdict-text { color: #4ade80; }
+    .verdict-put  .verdict-text { color: #f87171; }
+    .verdict-none .verdict-text { color: #94a3b8; }
+
+    .fetched-at {
+      font-size: 0.68rem;
+      color: #4a5568;
+      text-align: right;
+      margin-top: 12px;
+      font-family: "SF Mono", "Fira Code", monospace;
+    }
+
+    .signals-loading, .signals-error {
+      text-align: center;
+      padding: 20px 0;
+      font-size: 0.85rem;
+      color: #6b7a99;
+    }
+    .signals-error { color: #f87171; }
+
+    /* ── Order form ────────────────────────────────────────────────────────── */
     .card {
       background: #1a1d27;
       border: 1px solid #2d3148;
@@ -69,10 +210,7 @@
       width: 100%;
     }
 
-    input:focus, select:focus {
-      border-color: #5b6bff;
-    }
-
+    input:focus, select:focus { border-color: #5b6bff; }
     select option { background: #1a1d27; }
 
     .preview {
@@ -87,7 +225,6 @@
       font-family: "SF Mono", "Fira Code", monospace;
       letter-spacing: 0.2px;
     }
-
     .preview span { color: #a5b4fc; font-weight: 600; }
 
     button {
@@ -103,7 +240,6 @@
       transition: background 0.15s, transform 0.1s;
       letter-spacing: 0.2px;
     }
-
     button:hover:not(:disabled) { background: #4a5bef; }
     button:active:not(:disabled) { transform: scale(0.98); }
     button:disabled { opacity: 0.5; cursor: not-allowed; }
@@ -115,22 +251,9 @@
       font-size: 0.88rem;
       display: none;
     }
-
-    .status.success {
-      display: block;
-      background: #0d2b1f;
-      border: 1px solid #1a5c38;
-      color: #4ade80;
-    }
-
-    .status.error {
-      display: block;
-      background: #2b0d0d;
-      border: 1px solid #5c1a1a;
-      color: #f87171;
-    }
-
-    .status .label { font-weight: 700; margin-bottom: 4px; }
+    .status.success { display: block; background: #0d2b1f; border: 1px solid #1a5c38; color: #4ade80; }
+    .status.error   { display: block; background: #2b0d0d; border: 1px solid #5c1a1a; color: #f87171; }
+    .status .label  { font-weight: 700; margin-bottom: 4px; }
     .status .detail { font-family: "SF Mono", "Fira Code", monospace; font-size: 0.8rem; opacity: 0.85; word-break: break-all; }
 
     .spinner {
@@ -143,11 +266,23 @@
       vertical-align: middle;
       margin-right: 6px;
     }
-
     @keyframes spin { to { transform: rotate(360deg); } }
   </style>
 </head>
 <body>
+
+  <!-- Signals panel -->
+  <div class="signals-card">
+    <div class="signals-header">
+      <h2>SPY Options Signals</h2>
+      <button class="refresh-btn" id="refreshBtn" onclick="loadSignals()">Refresh</button>
+    </div>
+    <div id="signalsBody">
+      <div class="signals-loading"><span class="spinner"></span> Loading signals…</div>
+    </div>
+  </div>
+
+  <!-- Order form -->
   <div class="card">
     <h1>Place Options Order</h1>
 
@@ -209,6 +344,71 @@
   </div>
 
   <script>
+    /* ── Signals ───────────────────────────────────────────────────────────── */
+    function sigClass(s) { return 'sig-' + (s || 'neutral'); }
+
+    function tileHtml(name, valueText, sig, explanation) {
+      return `<div class="indicator-tile">
+        <div class="indicator-name">${name}</div>
+        <div class="indicator-value">${valueText}</div>
+        <span class="indicator-signal ${sigClass(sig)}">${sig.replace('_', ' ')}</span>
+        <div class="indicator-explanation">${explanation}</div>
+      </div>`;
+    }
+
+    function renderSignals(d) {
+      const ind = d.indicators;
+      const vxx = d.vxx;
+      const vxxTile = vxx
+        ? tileHtml('VXX (volatility proxy)', vxx.value, vxx.signal, vxx.explanation)
+        : `<div class="indicator-tile"><div class="indicator-name">VXX</div><div class="indicator-explanation" style="padding-top:4px">Unavailable</div></div>`;
+
+      const verdictClass = d.verdict === 'Consider CALL' ? 'verdict-call'
+                         : d.verdict === 'Consider PUT'  ? 'verdict-put'
+                         : 'verdict-none';
+
+      document.getElementById('signalsBody').innerHTML = `
+        <div class="spy-price">SPY last price: <strong>$${d.spy_price}</strong></div>
+        <div class="indicator-grid">
+          ${tileHtml('RSI (14)', ind.rsi.value, ind.rsi.signal, ind.rsi.explanation)}
+          ${tileHtml('MACD Histogram', ind.macd.histogram, ind.macd.signal, ind.macd.explanation)}
+        </div>
+        <div class="indicator-row-full">
+          ${tileHtml('EMA (20)', '$' + ind.ema20.value, ind.ema20.signal, ind.ema20.explanation)}
+        </div>
+        <div class="indicator-row-full">${vxxTile}</div>
+        <div class="verdict-box ${verdictClass}">
+          <div class="verdict-label">Combined Signal</div>
+          <div class="verdict-text">${d.verdict}</div>
+        </div>
+        <div class="fetched-at">as of ${d.fetched_at}</div>`;
+    }
+
+    async function loadSignals() {
+      const btn  = document.getElementById('refreshBtn');
+      const body = document.getElementById('signalsBody');
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner"></span>';
+      body.innerHTML = '<div class="signals-loading"><span class="spinner"></span> Fetching…</div>';
+      try {
+        const res  = await fetch('/signals');
+        const data = await res.json();
+        if (!res.ok) {
+          body.innerHTML = `<div class="signals-error">Could not load signals: ${data.message ?? res.statusText}</div>`;
+        } else {
+          renderSignals(data);
+        }
+      } catch (err) {
+        body.innerHTML = `<div class="signals-error">Network error: ${err.message}</div>`;
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Refresh';
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', loadSignals);
+
+    /* ── Order form ────────────────────────────────────────────────────────── */
     function buildOCC(ticker, expDate, type, strike) {
       if (!ticker || !expDate || !type || !strike) return null;
       const d = new Date(expDate + "T00:00:00");
@@ -225,7 +425,7 @@
       const type    = document.getElementById("option_type").value;
       const strike  = document.getElementById("strike").value;
       const expDate = document.getElementById("expiration_date").value;
-      const occ = buildOCC(ticker, expDate, type, strike);
+      const occ     = buildOCC(ticker, expDate, type, strike);
       const preview = document.getElementById("preview");
       preview.innerHTML = occ
         ? `OCC symbol: <span>${occ}</span>`
@@ -242,14 +442,14 @@
       status.className = "status";
 
       const payload = {
-        ticker:             document.getElementById("ticker").value.trim().toUpperCase(),
-        option_type:        document.getElementById("option_type").value,
-        strike:             parseFloat(document.getElementById("strike").value),
-        limit_buy_price:    parseFloat(document.getElementById("limit_buy_price").value),
-        expiration_date:    document.getElementById("expiration_date").value,
-        qty:                parseInt(document.getElementById("qty").value, 10),
-        take_profit_price:  parseFloat(document.getElementById("take_profit_price").value),
-        stop_loss_price:    parseFloat(document.getElementById("stop_loss_price").value),
+        ticker:            document.getElementById("ticker").value.trim().toUpperCase(),
+        option_type:       document.getElementById("option_type").value,
+        strike:            parseFloat(document.getElementById("strike").value),
+        limit_buy_price:   parseFloat(document.getElementById("limit_buy_price").value),
+        expiration_date:   document.getElementById("expiration_date").value,
+        qty:               parseInt(document.getElementById("qty").value, 10),
+        take_profit_price: parseFloat(document.getElementById("take_profit_price").value),
+        stop_loss_price:   parseFloat(document.getElementById("stop_loss_price").value),
       };
 
       if (!payload.ticker || isNaN(payload.strike) || isNaN(payload.limit_buy_price) ||
@@ -270,7 +470,6 @@
           body: JSON.stringify(payload),
         });
         const data = await res.json();
-
         if (res.ok) {
           document.getElementById("statusLabel").textContent = "Order submitted";
           document.getElementById("statusDetail").textContent =
