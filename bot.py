@@ -9,6 +9,8 @@ from datetime import date, datetime
 import uvicorn
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from alpaca.trading.client import TradingClient
@@ -70,8 +72,8 @@ def place_exit_orders(order_id: str, entry: dict) -> None:
     qty        = entry["qty"]
     fill_price = entry["fill_price"]
 
-    sell_price = round(fill_price * (1 + PROFIT_TARGET), 2)
-    stop_price = round(fill_price * (1 - STOP_LOSS), 2)
+    sell_price = round(float(entry.get("take_profit_price") or fill_price * (1 + PROFIT_TARGET)), 2)
+    stop_price = round(float(entry.get("stop_loss_price")  or fill_price * (1 - STOP_LOSS)), 2)
 
     # Mark done immediately so a failure doesn't cause endless retries
     state[order_id]["exit_placed"] = True
@@ -146,6 +148,12 @@ async def lifespan(app: FastAPI):
     yield
 
 app = FastAPI(lifespan=lifespan)
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
+
+@app.get("/")
+def index():
+    return FileResponse("static/index.html")
 
 
 class OrderRequest(BaseModel):
@@ -155,6 +163,8 @@ class OrderRequest(BaseModel):
     limit_buy_price: float
     expiration_date: str
     qty: int = 1
+    take_profit_price: float
+    stop_loss_price: float
 
 
 @app.post("/order")
@@ -163,6 +173,10 @@ def submit_order(req: OrderRequest):
         raise HTTPException(400, "option_type must be 'call' or 'put'")
     if req.strike <= 0 or req.limit_buy_price <= 0:
         raise HTTPException(400, "strike and limit_buy_price must be positive")
+    if req.take_profit_price <= req.limit_buy_price:
+        raise HTTPException(400, "take_profit_price must be above limit_buy_price")
+    if req.stop_loss_price >= req.limit_buy_price:
+        raise HTTPException(400, "stop_loss_price must be below limit_buy_price")
     if req.qty < 1:
         raise HTTPException(400, "qty must be >= 1")
     try:
@@ -190,6 +204,8 @@ def submit_order(req: OrderRequest):
         "occ_symbol": occ_symbol,
         "qty": req.qty,
         "limit_buy_price": req.limit_buy_price,
+        "take_profit_price": req.take_profit_price,
+        "stop_loss_price": req.stop_loss_price,
         "exit_placed": False,
     }
     save_state(state)
