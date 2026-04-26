@@ -5,6 +5,9 @@ import os
 import time
 from contextlib import asynccontextmanager
 from datetime import date, datetime, timedelta
+from pathlib import Path
+
+BASE_DIR = Path(__file__).parent
 
 import pandas as pd
 import ta
@@ -160,12 +163,12 @@ async def lifespan(app: FastAPI):
     yield
 
 app = FastAPI(lifespan=lifespan)
-app.mount("/static", StaticFiles(directory="static"), name="static")
+app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
 
 
 @app.get("/")
 def index():
-    return FileResponse("static/index.html")
+    return FileResponse(BASE_DIR / "static" / "index.html")
 
 
 @app.get("/signals")
